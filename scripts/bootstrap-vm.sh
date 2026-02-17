@@ -15,6 +15,9 @@ set -euo pipefail
 #   RUN_USER  (default: current sudo user or current user)
 #   LETSENCRYPT_STAGING (default: false)
 #   ALLOW_SELF_SIGNED_FALLBACK (default: false)
+#   INSTALL_RENEW_TIMER (default: true)
+#   RENEW_TIMER_ONCALENDAR (default: *-*-* 03:17:00)
+#   RENEW_TIMER_RANDOMIZED_DELAY (default: 45m)
 
 : "${REPO_URL:?Set REPO_URL, e.g. https://gitlab.com/ivan-devops1/adguard-stack.git}"
 : "${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN, e.g. myadguardzi.duckdns.org}"
@@ -26,6 +29,9 @@ set -euo pipefail
 
 LETSENCRYPT_STAGING="${LETSENCRYPT_STAGING:-false}"
 ALLOW_SELF_SIGNED_FALLBACK="${ALLOW_SELF_SIGNED_FALLBACK:-false}"
+INSTALL_RENEW_TIMER="${INSTALL_RENEW_TIMER:-true}"
+RENEW_TIMER_ONCALENDAR="${RENEW_TIMER_ONCALENDAR:-*-*-* 03:17:00}"
+RENEW_TIMER_RANDOMIZED_DELAY="${RENEW_TIMER_RANDOMIZED_DELAY:-45m}"
 
 STACK_DIR="${STACK_DIR:-/opt/adguard-stack}"
 RUN_USER="${RUN_USER:-${SUDO_USER:-$USER}}"
@@ -76,6 +82,9 @@ ADGUARD_ADMIN_PASSWORD=${ADGUARD_ADMIN_PASSWORD}
 LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
 LETSENCRYPT_STAGING=${LETSENCRYPT_STAGING}
 ALLOW_SELF_SIGNED_FALLBACK=${ALLOW_SELF_SIGNED_FALLBACK}
+INSTALL_RENEW_TIMER=${INSTALL_RENEW_TIMER}
+RENEW_TIMER_ONCALENDAR=${RENEW_TIMER_ONCALENDAR}
+RENEW_TIMER_RANDOMIZED_DELAY=${RENEW_TIMER_RANDOMIZED_DELAY}
 ENVFILE
 chmod 600 "$STACK_DIR/.env"
 
@@ -129,6 +138,16 @@ fi
 
 echo "Starting nginx..."
 docker compose up -d nginx
+
+if [[ "$INSTALL_RENEW_TIMER" == "true" ]]; then
+  echo "Installing automatic Let's Encrypt renewal timer..."
+  ENV_FILE="$STACK_DIR/.env" \
+  STACK_DIR="$STACK_DIR" \
+  RUN_USER="$RUN_USER" \
+  RENEW_TIMER_ONCALENDAR="$RENEW_TIMER_ONCALENDAR" \
+  RENEW_TIMER_RANDOMIZED_DELAY="$RENEW_TIMER_RANDOMIZED_DELAY" \
+  "$STACK_DIR/scripts/install-renew-timer.sh"
+fi
 
 echo "Stack status:"
 docker compose ps
