@@ -1,0 +1,69 @@
+services:
+  # 1. AdGuard Home
+  adguard:
+    image: adguard/adguardhome
+    container_name: adguard
+    restart: unless-stopped
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "3000:3000/tcp" # Initial Setup Port
+      - "853:853/tcp"        # <--- ADD THIS
+      - "853:853/udp"        # <--- ADD THIS (For DoQ)
+    volumes:
+      - ./config/adguard/work:/opt/adguardhome/work
+      - ./config/adguard/conf:/opt/adguardhome/conf
+      - ./letsencrypt:/opt/adguardhome/ssl:ro  # <--- ADD THIS
+    networks:
+      - adguard-net
+
+  # 2. Nginx (Reverse Proxy)
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN}
+    volumes:
+      - ./nginx_conf/default.conf:/etc/nginx/templates/default.conf.template:ro
+      - ./letsencrypt:/etc/letsencrypt:ro # Read-only access to certs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - adguard-net
+    depends_on:
+      - adguard
+
+  # 3. DuckDNS Updater (Keeps your IP synced)
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: duckdns
+    restart: unless-stopped
+    environment:
+      - SUBDOMAINS=${DUCKDNS_SUBDOMAINS} # Just the "name" part (e.g., if myhome.duckdns.org, put 'myhome')
+      - TOKEN=${DUCKDNS_TOKEN}
+      - LOG_FILE=false
+    networks:
+      - adguard-net
+
+# 4. Certbot Renewal (Runs every 12h to check for renewals)
+  certbot-renew:
+    image: infinityofspace/certbot_dns_duckdns:latest
+    container_name: certbot-renew
+    volumes:
+      - ./letsencrypt:/etc/letsencrypt
+    # This entrypoint checks if cert needs renewal, renews, and reloads nginx
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - adguard-net
+
+networks:
+  adguard-net:
+    driver: bridge
