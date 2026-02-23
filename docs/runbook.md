@@ -1,83 +1,83 @@
-# Runbook Operativo
+# Operations Runbook
 
-## Arranque limpio (recomendado)
-1. Asegurar configuración de entorno:
-   - `cp .env.example .env` (si es primera vez)
-   - Completar variables requeridas en `.env`:
+## Clean Start (recommended)
+1. Prepare environment configuration:
+   - `cp .env.example .env` (first run only)
+   - Fill required variables in `.env`:
      - `PUBLIC_DOMAIN`
      - `DUCKDNS_SUBDOMAINS`
      - `DUCKDNS_TOKEN`
      - `ADGUARD_ADMIN_USER`
      - `ADGUARD_ADMIN_PASSWORD`
      - `LETSENCRYPT_EMAIL`
-2. Ejecutar bootstrap local (flujo LE-first):
-   - `sudo PUBLIC_DOMAIN="tu-subdominio.duckdns.org" DUCKDNS_SUBDOMAINS="tu-subdominio" DUCKDNS_TOKEN="TU_TOKEN" ADGUARD_ADMIN_USER="admin" ADGUARD_ADMIN_PASSWORD="CAMBIAR_PASSWORD" LETSENCRYPT_EMAIL="you@example.com" LETSENCRYPT_STAGING="false" ALLOW_SELF_SIGNED_FALLBACK="false" INSTALL_RENEW_TIMER="true" bash scripts/bootstrap-local.sh`
-3. Confirmar estado:
+2. Run local bootstrap (LE-first flow):
+   - `sudo PUBLIC_DOMAIN="your-subdomain.duckdns.org" DUCKDNS_SUBDOMAINS="your-subdomain" DUCKDNS_TOKEN="YOUR_TOKEN" ADGUARD_ADMIN_USER="admin" ADGUARD_ADMIN_PASSWORD="CHANGE_PASSWORD" LETSENCRYPT_EMAIL="you@example.com" LETSENCRYPT_STAGING="false" ALLOW_SELF_SIGNED_FALLBACK="false" INSTALL_RENEW_TIMER="true" bash scripts/bootstrap-local.sh`
+3. Confirm status:
    - `sudo docker compose ps`
-4. Validar timer de renovación:
+4. Validate renewal timer:
    - `./scripts/renew-timer-status.sh`
-   - Si `INSTALL_RENEW_TIMER=true`, el contenedor `certbot-renew` debe quedar detenido.
+   - If `INSTALL_RENEW_TIMER=true`, `certbot-renew` should be stopped.
 
-## Validación funcional
-1. Abrir `https://<PUBLIC_DOMAIN>` y comprobar acceso a AdGuard.
-2. Verificar endpoint DoH `https://<PUBLIC_DOMAIN>/dns-query`.
-3. Revisar logs: `./scripts/logs.sh 200`.
-4. Validar certificado servido:
+## Functional Validation
+1. Open `https://<PUBLIC_DOMAIN>` and confirm AdGuard access.
+2. Verify DoH endpoint: `https://<PUBLIC_DOMAIN>/dns-query`.
+3. Review logs: `./scripts/logs.sh 200`.
+4. Validate served certificate:
    - `echo | openssl s_client -connect "<PUBLIC_DOMAIN>:443" -servername "<PUBLIC_DOMAIN>" 2>/dev/null | openssl x509 -noout -issuer -subject -dates`
-5. Confirmar política de exposición:
-   - `3000/tcp` está ligado a `127.0.0.1` en el host; no abrirlo en OCI.
+5. Confirm exposure policy:
+   - `3000/tcp` is bound to host loopback (`127.0.0.1`); do not open it in OCI.
 
-## Renovación de certificados
-- Modo recomendado (Linux con systemd): timer `adguard-renew.timer`.
-  - Renovación manual:
+## Certificate Renewal
+- Recommended mode (Linux with systemd): `adguard-renew.timer`.
+  - Manual renewal:
     - `./scripts/renew-letsencrypt.sh`
-  - Instalar/reinstalar timer:
+  - Install/reinstall timer:
     - `sudo ./scripts/install-renew-timer.sh`
-  - Ver estado:
+  - Check status:
     - `./scripts/renew-timer-status.sh`
-  - Desinstalar timer:
+  - Uninstall timer:
     - `sudo ./scripts/uninstall-renew-timer.sh`
-- Modo fallback (sin systemd): contenedor `certbot-renew`.
+- Fallback mode (without systemd): `certbot-renew` container.
   - `./scripts/renew-letsencrypt.sh`
   - `docker compose up -d certbot-renew`
 
-## Recuperación básica
-1. Si Nginx falla, validar sintaxis:
+## Basic Recovery
+1. If Nginx fails, validate config syntax:
    - `docker compose exec nginx nginx -t`
-2. Reiniciar servicio afectado:
+2. Restart affected service:
    - `docker compose restart nginx`
    - `docker compose restart adguard`
-3. Si persiste, reiniciar stack completo:
+3. If issue persists, restart full stack:
    - `docker compose down && docker compose up -d`
-4. Si falla bootstrap por certificado:
-   - validar DNS del dominio (`dig +short <PUBLIC_DOMAIN>`)
-   - revisar logs de `duckdns` y `nginx`
-   - usar `ALLOW_SELF_SIGNED_FALLBACK="true"` solo como contingencia temporal
+4. If bootstrap fails during certificate issuance:
+   - validate domain DNS (`dig +short <PUBLIC_DOMAIN>`)
+   - inspect `duckdns` and `nginx` logs
+   - use `ALLOW_SELF_SIGNED_FALLBACK="true"` only as temporary contingency
 
-## Checklist post-incidente
-- Estado de contenedores `Up` en `docker compose ps`.
-- Certificados presentes en `letsencrypt/live/`.
-- Resolución DNS y acceso HTTPS restaurados.
+## Post-Incident Checklist
+- Containers are `Up` in `docker compose ps`.
+- Certificates exist under `letsencrypt/live/`.
+- DNS resolution and HTTPS access are restored.
 
-## Rotación de secretos
-- Rotar inmediatamente si hubo exposición de:
+## Secret Rotation
+- Rotate immediately if any of these are exposed:
   - `DUCKDNS_TOKEN`
   - `ADGUARD_ADMIN_PASSWORD`
-- Actualizar `.env`, reiniciar servicios y validar acceso:
+- Update `.env`, restart services, and validate access:
   - `sudo docker compose restart duckdns adguard nginx`
 
-## Política de puertos recomendada (OCI)
-- `22/tcp`: solo IP de administración.
-- `80/tcp`: público si usas redirección HTTP->HTTPS.
-- `443/tcp`: público para HTTPS/DoH.
-- `853/tcp`: público para DoT.
-- `53/tcp` y `53/udp`: abrir solo si realmente usas DNS clásico.
-- `853/udp`: abrir solo si usas DoQ.
-- `3000/tcp`: no abrir (uso local en loopback únicamente).
+## Recommended OCI Port Policy
+- `22/tcp`: admin IP only.
+- `80/tcp`: public only if using HTTP→HTTPS redirect.
+- `443/tcp`: public for HTTPS/DoH.
+- `853/tcp`: public for DoT.
+- `53/tcp` and `53/udp`: open only if you need classic DNS.
+- `853/udp`: open only if you need DoQ.
+- `3000/tcp`: do not open (loopback-only local diagnostics).
 
-## Incidentes y diagnóstico
-- Para resolución de fallas conocidas, seguir `docs/troubleshooting.md`.
+## Incidents and Diagnostics
+- For known issue playbooks, use `docs/troubleshooting.md`.
 
-## Respaldo recomendado
-- Ejecutar `./scripts/backup.sh` antes de cambios mayores.
-- Verificar creación de archivo en `backups/`.
+## Recommended Backups
+- Run `./scripts/backup.sh` before major changes.
+- Verify backup artifacts in `backups/`.

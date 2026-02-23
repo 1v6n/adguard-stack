@@ -1,17 +1,17 @@
-# Guía de Troubleshooting
+# Troubleshooting Guide
 
-> Ruta canónica recomendada para operación manual: `~/adguard-stack`.
-> Usa `/opt/adguard-stack` solo si desplegaste con `bootstrap-vm.sh`.
+> Recommended canonical path for manual operations: `~/adguard-stack`.
+> Use `/opt/adguard-stack` only if you deployed with `bootstrap-vm.sh`.
 
-## Incidentes Detectados y Soluciones
+## Known Incidents and Fixes
 
 ### 1) `failed to bind host port ... :53 ... address already in use`
-- **Causa**: El servicio DNS del host (`systemd-resolved`) ya está escuchando en el puerto `53`.
-- **Diagnóstico**:
+- **Cause**: Host DNS service (`systemd-resolved`) is already listening on port `53`.
+- **Diagnosis**:
   ```bash
   sudo ss -ltnup | grep ':53 '
   ```
-- **Solución**:
+- **Fix**:
   ```bash
   sudo mkdir -p /etc/systemd/resolved.conf.d
   cat <<'CFG' | sudo tee /etc/systemd/resolved.conf.d/no-stub.conf
@@ -23,73 +23,73 @@
   ```
 
 ### 2) `no configuration file provided: not found`
-- **Causa**: `docker compose` se ejecuta fuera del directorio del proyecto.
-- **Solución**:
+- **Cause**: `docker compose` is executed outside the project directory.
+- **Fix**:
   ```bash
   cd ~/adguard-stack
-  # o, si usaste bootstrap remoto:
+  # or, if you used remote bootstrap:
   # cd /opt/adguard-stack
   docker compose ps
   ```
 
 ### 3) `.env` permission denied
-- **Causa**: `.env` fue creado por root y el usuario operativo no puede leerlo.
-- **Solución**:
+- **Cause**: `.env` was created by root and cannot be read by the runtime user.
+- **Fix**:
   ```bash
-  # stack local:
+  # local stack:
   sudo chown "$USER:$USER" ~/adguard-stack/.env
   chmod 600 ~/adguard-stack/.env
-  # stack remoto:
+  # remote stack:
   # sudo chown <user>:<group> /opt/adguard-stack/.env
   ```
 
-### 4) Nginx en crash loop: certificado faltante
-- **Causa**: Los archivos TLS no existen aún en `letsencrypt/live/<domain>/`.
-- **Solución**:
-  - Flujo recomendado: LE-first (`ALLOW_SELF_SIGNED_FALLBACK=false`), emitir certificado antes de iniciar `nginx`.
-  - Contingencia: usar self-signed solo con `ALLOW_SELF_SIGNED_FALLBACK=true`.
+### 4) Nginx crash loop: missing certificate
+- **Cause**: TLS files are missing in `letsencrypt/live/<domain>/`.
+- **Fix**:
+  - Preferred flow: LE-first (`ALLOW_SELF_SIGNED_FALLBACK=false`), issue certificate before starting `nginx`.
+  - Contingency only: allow self-signed fallback with `ALLOW_SELF_SIGNED_FALLBACK=true`.
 
-### 5) `No route to host` al hacer curl a la IP pública desde la VM
-- **Causa**: Comportamiento de red/cloud (hairpin o ruta interna).
-- **Solución**: validar internamente por `127.0.0.1` y validar externamente desde otro host.
+### 5) `No route to host` when curling public IP from inside the VM
+- **Cause**: Cloud networking behavior (hairpin/routing constraints).
+- **Fix**: validate locally through `127.0.0.1` and validate externally from another host.
 
 ### 6) `/home/.../.env: line ... 03:17:00: command not found`
-- **Causa**: `RENEW_TIMER_ONCALENDAR` sin comillas en `.env`.
-- **Solución**:
+- **Cause**: `RENEW_TIMER_ONCALENDAR` in `.env` is missing quotes.
+- **Fix**:
   ```bash
   sed -i 's/^RENEW_TIMER_ONCALENDAR=.*/RENEW_TIMER_ONCALENDAR="*-*-* 03:17:00"/' .env
   ```
 
-### 7) `502 Bad Gateway` con Nginx arriba pero AdGuard inaccesible
-- **Causa**: desalineación de rutas/proyectos (stack levantado desde un directorio, configuración editada en otro) o AdGuard en estado first-run (`/install.html`).
-- **Solución**:
+### 7) `502 Bad Gateway` while Nginx is up but AdGuard is unreachable
+- **Cause**: path/project mismatch (stack started from one directory, config edited in another) or AdGuard still in first-run state (`/install.html`).
+- **Fix**:
   ```bash
   sudo docker inspect adguard --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}'
-  # editar configuración en el path real montado y reiniciar desde ese mismo proyecto
+  # edit config in the real mounted path and restart from that same project directory
   ```
 
-### 8) Renovación duplicada o reinicios inesperados de Nginx
-- **Causa**: timer `systemd` y contenedor `certbot-renew` activos a la vez.
-- **Solución**:
+### 8) Duplicate renewal or unexpected Nginx restarts
+- **Cause**: both `systemd` timer and `certbot-renew` container are active.
+- **Fix**:
   ```bash
-  # modo recomendado
+  # recommended mode
   ./scripts/renew-timer-status.sh
   docker compose stop certbot-renew
 
-  # modo fallback (sin systemd)
+  # fallback mode (without systemd)
   sudo ./scripts/uninstall-renew-timer.sh
   docker compose up -d certbot-renew
   ```
 
-## Secuencia de Validación Rápida
+## Quick Validation Sequence
 ```bash
 cd ~/adguard-stack
 sudo docker compose ps
 curl -v http://127.0.0.1:80
 curl -vk https://127.0.0.1:443
-# opcional (solo diagnóstico de AdGuard directo):
+# optional (direct AdGuard diagnostics only):
 # curl -v http://127.0.0.1:3000
 ```
 
-## Referencia de puertos y operación base
-- Para política de puertos y operación diaria, ver `docs/runbook.md`.
+## Port Policy and Base Operations
+- For port policy and daily operations, see `docs/runbook.md`.

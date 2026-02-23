@@ -1,61 +1,61 @@
-# Estándar de Documentación Operativa
+# Operational Documentation Standard
 
-## Objetivo
-Definir un estándar mínimo y consistente para documentar operación, despliegue, seguridad y recuperación del stack (`AdGuard + Nginx + DuckDNS + Let's Encrypt`) de forma reproducible.
+## Objective
+Define a minimum, consistent standard to document operation, deployment, security, and recovery of the stack (`AdGuard + Nginx + DuckDNS + Let's Encrypt`) in a reproducible way.
 
-## Principios
-- **Ejecutable**: cada procedimiento debe incluir comandos copy/paste.
-- **Verificable**: cada paso crítico debe tener una validación esperada.
-- **Versionado**: documentación y cambios operativos se actualizan en el mismo commit/PR.
-- **Mínima ambigüedad**: usar rutas absolutas o `cwd` explícito (`cd /ruta/proyecto`).
-- **Seguridad por defecto**: nunca incluir tokens, claves ni certificados reales.
+## Principles
+- **Executable**: every procedure must include copy/paste-ready commands.
+- **Verifiable**: every critical step must include expected validation.
+- **Versioned**: docs and operational changes are updated in the same commit/PR.
+- **Low ambiguity**: use absolute paths or explicit `cwd` (`cd /path/to/project`).
+- **Secure by default**: never include real tokens, private keys, or certificates.
 
-## Estructura obligatoria
+## Required Structure
 - `README.md`
-  - Setup limpio desde cero.
-  - Variables de entorno requeridas (`.env`).
-  - Puertos expuestos y propósito.
+  - Clean setup from zero.
+  - Required environment variables (`.env`).
+  - Exposed ports and purpose.
 - `docs/runbook.md`
-  - Operación diaria: restart, logs, checks, backups.
-  - Procedimientos de recuperación.
+  - Daily operation: restart, logs, checks, backups.
+  - Recovery procedures.
 - `docs/troubleshooting.md`
-  - Fallas reales conocidas con diagnóstico y solución.
-- `docs/OPERATIONS_STANDARD.md` (este documento)
-  - Reglas para mantener calidad documental.
+  - Known real failures with diagnosis and fix steps.
+- `docs/OPERATIONS_STANDARD.md` (this document)
+  - Rules to keep documentation quality consistent.
 
-## Formato por procedimiento
-Cada procedimiento nuevo debe incluir:
-1. **Propósito** (qué resuelve).
-2. **Precondiciones** (permisos, puertos, servicios, variables).
-3. **Comandos** (bloque shell único y ordenado).
-4. **Validación** (comandos + resultado esperado).
-5. **Rollback/Salida** (cómo deshacer o volver a estado estable).
+## Procedure Format
+Every new procedure should include:
+1. **Purpose** (what it solves).
+2. **Preconditions** (permissions, ports, services, variables).
+3. **Commands** (single ordered shell block).
+4. **Validation** (commands + expected output/behavior).
+5. **Rollback/Exit** (how to return to a stable state).
 
-## Requisitos mínimos de contenido operativo
-- Flujo de bootstrap (local y VM) con orden real de ejecución.
-- Política TLS (LE-first, fallback explícito, renovación automática).
-- Definir una única estrategia de renovación activa (timer `systemd` o `certbot-renew`, no ambas).
-- Ciclo completo de timer: instalar, estado, desinstalar.
-- Checklist de seguridad de puertos en OCI.
-- Pasos de rotación de secretos en caso de exposición.
+## Minimum Operational Content Requirements
+- Bootstrap flow (local and VM) with real execution order.
+- TLS policy (LE-first, explicit fallback, automatic renewal).
+- One active renewal strategy at a time (`systemd` timer or `certbot-renew`, not both).
+- Full timer lifecycle: install, status, uninstall.
+- OCI port security checklist.
+- Secret rotation steps after exposure.
 
-## Regla de actualización
-Cualquier cambio en:
-- scripts en `scripts/`
-- variables en `.env.example`
-- puertos o comportamiento en `docker-compose.yml`
-debe reflejarse en `README.md` y, si aplica, en `runbook`/`troubleshooting` dentro del mismo PR.
+## Update Rule
+Any change to:
+- scripts in `scripts/`
+- variables in `.env.example`
+- ports or behavior in `docker-compose.yml`
+must be reflected in `README.md` and, when applicable, in `runbook`/`troubleshooting` in the same PR.
 
-## Checklist para PR Operativo
-- [ ] `docker compose config` sin errores.
-- [ ] Script nuevo/actualizado con `bash -n`.
-- [ ] README actualizado (uso + variables nuevas).
-- [ ] Runbook/Troubleshooting actualizado si cambió comportamiento de operación.
-- [ ] Sin secretos en diff (`.env`, tokens, claves privadas).
+## Operational PR Checklist
+- [ ] `docker compose config` passes without errors.
+- [ ] New/updated scripts pass `bash -n`.
+- [ ] README updated (usage + new variables).
+- [ ] Runbook/Troubleshooting updated if operational behavior changed.
+- [ ] No secrets in diff (`.env`, tokens, private keys).
 
-## Convenciones de comandos en documentación
-- Prefijar con `sudo` cuando sea obligatorio.
-- No mezclar comandos de distintos paths sin indicar `cd`.
-- Evitar placeholders ambiguos; usar ejemplos explícitos:
+## Command Conventions in Docs
+- Prefix with `sudo` when required.
+- Do not mix commands from different paths without an explicit `cd`.
+- Avoid ambiguous placeholders; use explicit examples:
   - `PUBLIC_DOMAIN="myadguardstack.duckdns.org"`
   - `INSTALL_RENEW_TIMER="true"`
